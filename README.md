@@ -1,22 +1,50 @@
-Projeto Banco – Refatoração com SOLID
 
-Este projeto demonstra a aplicação de princípios SOLID sobre um código de exemplo de sistema bancário.
+# Projeto Banco – Refatoração com SOLID
 
-Abaixo, cada classe é documentada com a versão original, o princípio aplicado e a versão refatorada.
+Este projeto demonstra a aplicação de princípios **SOLID** sobre um código de exemplo de sistema bancário (contas, clientes, transações e operações).
 
-Como Executar
-Versão original
+Abaixo, cada classe é documentada com a versão **original**, o **princípio aplicado** e a versão **refatorada**.
+
+---
+
+## 📦 Estrutura do Repositório
+
+```
+projeto-solid/
+│
+├── original/
+│   ├── OriginalClasses.php
+│   └── OriginalScript.php
+│
+├── solid/
+│   └── RefactoredClasses.php
+│
+└── README.md
+```
+
+---
+
+## ▶️ Como Executar
+
+### Versão original (com HTML simples)
+```bash
 php -S localhost:8000 -t original
-# abra http://localhost:8000/OriginalScript.php
+# abra no navegador: http://localhost:8000/OriginalScript.php
+```
 
-Versão SOLID (exemplo rápido em linha de comando)
+### Versão SOLID (teste rápido via CLI)
+```bash
 php -r "require 'solid/RefactoredClasses.php';
 $m=criar_dados_mock(); $ops=$m['ops'];
-$ops->deposit('0001-CC', 100);
-print_r($ops->history());"
+$ops->deposit('0001-CC', 100); print_r($ops->history());"
+```
 
-Conta
-a) Classe Original
+---
+
+## Conta
+
+### a) Classe Original
+```php
 // original/OriginalClasses.php (trecho)
 abstract class Conta {
     protected float $saldo;
@@ -54,17 +82,13 @@ class ContaPoupanca extends Conta {
     }
 }
 
-b) Princípio SOLID Aplicado
+```
 
-LSP: as subclasses mantêm o contrato de Conta (podem ser usadas no lugar da classe base).
+### b) Princípio SOLID Aplicado
+- **LSP (Substituição de Liskov)**, **OCP (Aberto/Fechado)**, **SRP**, **ISP**
 
-OCP: adicionar um novo tipo de conta requer criar uma nova subclasse, sem alterar as existentes.
-
-ISP: extraímos interfaces pequenas para separar leitura/uso de recursos extras (ex.: rendimento).
-
-SRP: a classe cuida apenas das regras de uma conta; log e persistência ficam fora.
-
-c) Classe Refatorada
+### c) Classe Refatorada
+```php
 // solid/RefactoredClasses.php (trecho)
 interface ReadOnlyAccountInterface {
     public function getNumber(): string;
@@ -82,9 +106,11 @@ interface InterestBearing { public function applyYield(int $months=1): void; }
 abstract class Account implements AccountInterface { /* mesmas regras essenciais */ }
 final class CheckingAccount extends Account { /* saque com overdraft */ }
 final class SavingsAccount  extends Account implements InterestBearing { /* rendimento */ }
+```
+### Operação → OperationService
 
-Operação → OperationService
-a) Classe Original
+### a) Classe Original
+```php
 class Operacao {
     /** @var Transacao[] */ private array $log = [];
     private int $seq = 1;
@@ -96,13 +122,13 @@ class Operacao {
     public function getLog(): array { return $this->log; }
 }
 
-b) Princípio SOLID Aplicado
+```
 
-DIP: o serviço agora depende de interfaces (AccountRepositoryInterface, TransactionLoggerInterface, ClockInterface), não de implementações concretas.
+### b) Princípio SOLID Aplicado
+- **DIP: o serviço agora depende de interfaces (AccountRepositoryInterface, TransactionLoggerInterface, ClockInterface), não de implementações concretas. SRP: coordena operações e registra transações; não armazena contas nem se preocupa com UI/saída.**
 
-SRP: coordena operações e registra transações; não armazena contas nem se preocupa com UI/saída.
-
-c) Classe Refatorada
+### c) Classe Refatorada
+```php
 interface AccountRepositoryInterface {
     public function add(AccountInterface $a): void;
     public function remove(string $n): void;
@@ -129,9 +155,12 @@ final class OperationService {
     }
     // withdraw(), transfer() análogas…
 }
+```
 
-Banco → Repositório
-a) Classe Original
+### Banco → Repositório
+
+### a) Classe Original
+```php
 class Banco {
     /** @var array<string, Conta> */ private array $contas = [];
     public function criarConta(Conta $c): void { $this->contas[$c->getNumero()] = $c; }
@@ -139,12 +168,13 @@ class Banco {
     /** @return Conta[] */ public function listarContas(): array { return array_values($this->contas); }
 }
 
-b) Princípio SOLID Aplicado
+```
 
-DIP/SRP: criamos a abstração AccountRepositoryInterface e uma implementação em memória (InMemoryAccountRepository).
-O repositório só armazena e recupera contas; regras ficam no serviço.
+### b) Princípio SOLID Aplicado
+- **DIP/SRP: criamos a abstração AccountRepositoryInterface e uma implementação em memória (InMemoryAccountRepository). O repositório só armazena e recupera contas; regras ficam no serviço.**
 
-c) Classe Refatorada
+### c) Classe Refatorada
+```php
 final class InMemoryAccountRepository implements AccountRepositoryInterface {
     /** @var array<string, AccountInterface> */ private array $byNumber = [];
     public function add(AccountInterface $a): void { $this->byNumber[$a->getNumber()] = $a; }
@@ -156,8 +186,12 @@ final class InMemoryAccountRepository implements AccountRepositoryInterface {
     public function all(): array { return array_values($this->byNumber); }
 }
 
-Transação → Transaction + Logger
-a) Classe Original
+```
+
+### Transação → Transaction + Logger
+
+### a) Classe Original
+```php
 class Transacao {
     public function __construct(
         public int $id, public DateTimeImmutable $data, public float $valor,
@@ -165,15 +199,13 @@ class Transacao {
     ) {}
     public static function registrar(/* ... */): self { /* cria com data atual */ }
 }
+```
 
-b) Princípio SOLID Aplicado
+### b) Princípio SOLID Aplicado
+- **SRP: Transaction é apenas um Value Object. O histórico fica em um logger com interface (TransactionLoggerInterface), permitindo trocar por arquivo, DB, etc. DIP: OperationService não sabe como o log é armazenado, apenas usa a interface.**
 
-SRP: Transaction é apenas um Value Object.
-O histórico fica em um logger com interface (TransactionLoggerInterface), permitindo trocar por arquivo, DB, etc.
-
-DIP: OperationService não sabe como o log é armazenado, apenas usa a interface.
-
-c) Classe Refatorada
+### c) Classe Refatorada
+```php
 final class Transaction {
     public function __construct(
         public int $id,
@@ -190,21 +222,33 @@ final class InMemoryTransactionLogger implements TransactionLoggerInterface {
     public function all(): array { return $this->items; }
 }
 
-Cliente
-a) Classe Original
+```
+
+### Cliente
+
+### a) Classe Original
+```php
 class Cliente {
     public function __construct(public string $nome, public string $cpf, public string $endereco, public string $telefone) {}
     public function getInfo(): string { return "{$this->nome} | CPF: {$this->cpf} | {$this->telefone}"; }
 }
 
-b) Princípio SOLID Aplicado
+```
 
-SRP: Entidade simples, focada apenas em dados e uma apresentação mínima.
+### b) Princípio SOLID Aplicado
+- **SRP: Entidade simples, focada apenas em dados e uma apresentação mínima. (Opcional) Mudança de idioma e naming consistente (Client::info()).**
 
-(Opcional) Mudança de idioma e naming consistente (Client::info()).
-
-c) Classe Refatorada
+### c) Classe Refatorada
+```php
 final class Client {
     public function __construct(public string $name, public string $cpf, public string $address, public string $phone) {}
     public function info(): string { return "{$this->name} | CPF: {$this->cpf} | {$this->phone}"; }
 }
+
+```
+
+### Benefícios da Refatoração
+- **Baixo acoplamento (DIP): camadas dependem de interfaces, facilitando testes e troca de infraestrutura.**
+- **Coesão (SRP/ISP): responsabilidades claras; interfaces pequenas evitam dependências desnecessárias.**
+- **Extensibilidade (OCP/LSP): novos tipos de conta ou meios de armazenamento entram sem alterar classes estáveis.**
+- **Testabilidade: serviços e repositórios podem ser “mockados/fakeados”.**
